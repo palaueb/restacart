@@ -3,6 +3,7 @@
 MIT License
 
 Copyright (c) 2020 Marc Palau
+                   @palaueb
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,12 +27,17 @@ SOFTWARE.
 
 /* coded while my kids drove the sofa throught the imagination, and with 2 glasses of wine. */
 Class RestaCart {
+    public $file_folder = './files/';
+    
+    private $config_file = '.config';
     private $export_variable_labels = ['{{HTML_LANG}}'];
     private $export_variables = ['es'];
-    private $output_html = "DEFAULT TEXT";
-    private $cipher = 'aes-256-ecb';
-    private $error_string = false;
-    
+    private $output_html = "DEFAULT TEXT"; //at this time this must be deleted
+    private $cipher = 'AES-256-CBC';//the password cipher to save it to disk
+    private $error_string = false; //it's false when it's not an error (very basic aproach)
+    private $we_are_in = false; //are we logged?
+    private $session_variables = []; //I use this to avoid keeping the session opened (I just need to keep track of the login throught uploads)
+
     private $template = <<<TEMPLATE
 <!DOCTYPE html><html lang="{{HTML_LANG}}"><head><meta charset="utf-8">
 <title>RestaCart</title><meta name="original-source" content="https://github.com/palaueb/restacart">
@@ -78,35 +84,96 @@ TEMPLATE;
         }
     }
     private function init(){
-        if(!file_exists('.htaccess')){
-            $print_init_form = true;
-            if($_SERVER['REQUEST_METHOD']=='POST'){
-                if(isset($_POST['savepasswd'])){
-                    $pw1=$_POST['password1'];
-                    $pw2=$_POST['password2'];
-                    
-                    $print_init_form = false;
-                    
-                    if($pw1 != $pw2){
-                        $print_init_form = true;
-                        $this->set_error("<p>❌ Las contraseñas introducidas no son iguales. Vuelve a introducirlas.</p>");
-                    }
-                    if(strlen($pw1) < 12){
-                        $print_init_form = true;
-                        $this->set_error("<p>❌ La contraseña debe tener 12 o más carácteres. Usa una contraseña más larga (recuerda que puedes leer sobre contraseñas seguras en el enlace <a href=\"https://004.es/password_security\">Algunos consejos para contraseñas seguras</a>).</p>");
-                    }
-                    
-                    if($print_init_form == false){
-                        
-                    }
-                }
-            }
-            if($print_init_form){
-                $this->print_init_setup();
-            }
-            return true;
+        session_start();
+        $this->session_variables = $_SESSION;
+        session_write_close();
+        
+        if($_SERVER['REQUEST_METHOD']=='POST' && isset($_POST['action'])){
+            $this->process_post();
         }
+        
+        if(!file_exists('.htaccess') || !file_exists($this->config_file)){
+            return $this->print_init_setup();
+        }
+        
+        //just print the main internal page
+        if(!$this->we_are_in){
+            return $this->print_init_login();
+        }
+        
+        die("WE ARE IN!");
         //fill variables
+    }
+    private function process_post(){
+        switch($_POST['action']){
+            case 'password':
+                return $this->setup_password();
+            case 'login':
+                return $this->start_login();
+            case 'upload_file':
+                return false; //$this->upload_file();
+             case 'new_qr':
+                //return $this->create_qr();
+                break;
+            default:
+                die('this sucks!');
+         }
+    }
+    private function setup_password(){
+        if(file_exists('.htaccess') || file_exists($this->config_file)){ return false; }
+        
+        $pw1=$_POST['password1'];
+        $pw2=$_POST['password2'];
+        
+        $we_are_ok = true;
+        
+        if($pw1 != $pw2){
+            $we_are_ok = false;
+            $this->set_error("<p>❌ Las contraseñas introducidas no son iguales. Vuelve a introducirlas.</p>");
+        }
+        if(strlen($pw1) < 12){
+            $we_are_ok = false;
+            $this->set_error("<p>❌ La contraseña debe tener 12 o más carácteres. Usa una contraseña más larga (recuerda que puedes leer sobre contraseñas seguras en el enlace <a href=\"https://004.es/password_security\">Algunos consejos para contraseñas seguras</a>).</p>");
+        }
+        if($we_are_ok === true){
+            //GENERATE .config file and .htaccess and .htpasswd
+            $password_arr_data = $this->encrypt_password($pw1);
+            $cipher_text = base64_encode($password_arr_data['ciphertext']);
+            $iv = base64_encode($password_arr_data['iv']);
+            $key = base64_encode($password_arr_data['key']);
+
+            $config_data = json_encode([
+                'ciphertext' => $cipher_text,
+                'iv' => $iv,
+                'key' => $key
+            ]);
+            file_put_contents($this->config_file, $config_data);
+
+            //Create the .htaccess to avoid access to any dot file (.config, .git, .anything)
+            $htaccess_data = "RedirectMatch 404 /\..*$";
+            file_put_contents('.htaccess', $htaccess_data);
+            
+            //create the folder for uploaded files
+            if(!is_dir($this->file_folder)){
+                mkdir($this->file_folder, 0644);
+            }
+        }
+        //$this->current_step = 'LOGIN';
+        return $print_init_form;
+    }
+    private function start_login(){
+        //I know this is weird, and have a lot of improvements for security, but I'm trying to
+        //do it as fast as I can, and I have lots of distractions with my kids messing around, sorry!
+        // If you think you can improve, JUST DO IT!!! I will check it and aprove the pull request.
+        $current_password = base64_encode($this->encrypt_again_password($_POST['password1']));
+
+        $original_password_data = json_decode(file_get_contents($this->config_file),true);
+        $original_password = $original_password_data['ciphertext'];
+
+        if($current_password === $original_password){
+            die("WE ARE IN!!!!");
+        }
+        $this->set_error('La contraseña no es válida. Lo siento.');
     }
     private function print_headers(){
         //header("A: B");
@@ -127,6 +194,30 @@ TEMPLATE;
     private function get_error(){
         return $this->error_string;
     }
+    private function print_init_login(){
+        $this->add_text('TITLE_PAGE','Bienvenido a RestaCart.');
+        $output .= "<h4>Introduce la contraseña para acceder a RestaCart:</h4>";
+
+        $error_string = $this->get_error();
+        if($error_string !== false){
+            //$output .= $this->print_error($error_string);
+            $output .= "<div class='alert'><p>Error en los datos</p>";
+            $output .= $error_string."</div>";
+        }
+$form = <<<FORM
+<form method='post'>
+<div class="row">
+    <input type="hidden" name="action" value="login" />
+
+    <label class="two columns" for="password1">Contraseña:</label>
+    <input class="three columns" type='password' name='password1' id='password1' />
+    <input class="three columns" type='submit' value="Entrar" />
+</div>
+</form>
+FORM;
+        $this->add_text('OUTPUT_HTML',$output.$form);
+        return true;
+    }
     private function print_init_setup(){
         $this->add_text('TITLE_PAGE','Configuración de RestaCart.');
         $output .="<p>Te permito subir una o varias cartas a tu página web y te genero un código QR para ofrecerlo a tus clientes.</p>";
@@ -140,12 +231,14 @@ TEMPLATE;
         /* */
         $random_password = $this->generate_password();
         $output .= "<p>Vamos a configurar una contraseña para esta página.</p>";
+        
         $error_string = $this->get_error();
         if($error_string !== false){
             //$output .= $this->print_error($error_string);
             $output .= "<div class='alert'><p>Error en los datos</p>";
             $output .= $error_string."</div>";
         }
+        
 $form = <<<FORM
 <form method='post'>
 
@@ -153,15 +246,16 @@ $form = <<<FORM
 <div class="row">
     <div class="one-half column">
         <div class="row">
-            <label class="one-half column" for="password1">Contraseña</label>
+            <label class="one-half column" for="password1">Contraseña:</label>
             <input class="one-half column" type='password' name='password1' id='password1' />
         </div>
         <div class="row">
-            <label class="one-half column" for="password2">Repite contraseña</label>
+            <label class="one-half column" for="password2">Repite contraseña:</label>
             <input class="one-half column" type='password' name='password2' id='password2' />
         </div>
         <div class="row">
             <label class="one-half column">&nbsp;</label>
+            <input type="hidden" name="action" value="password" />
             <input class="one-half column" type='submit' name='savepasswd' id='savepasswd' value="Guardar contraseña" />
         </div>
     </div>
@@ -184,16 +278,27 @@ FORM;
         return str_replace($this->export_variable_labels,$this->export_variables,$this->template);
     }
     
-    private function create_folder(){}
-    private function process_form(){}
     private function encrypt_password($password){
-        $cipher = $this->cipher;
-        $key = '<generateKey>';
-        $ivlen = openssl_cipher_iv_length($cipher);
+        $password = base64_encode($password);
+
+        //TODO, refactor this to generate the key without the needs to save it.
+        $key = openssl_random_pseudo_bytes(256); 
+
+        $ivlen = openssl_cipher_iv_length($this->cipher);
         $iv = openssl_random_pseudo_bytes($ivlen);
-        $ciphertext = openssl_encrypt($password, $cipher, $key, $options=0, $iv, $tag);
-        return [$ciphertext, $iv, $key, $tag];
-        //TODO $original_plaintext = openssl_decrypt($ciphertext, $cipher, $key, $options=0, $iv, $tag);
+        $ciphertext = openssl_encrypt($password, $this->cipher, $key, 0, $iv);
+        return ['ciphertext'=>$ciphertext, 'iv'=>$iv, 'key'=>$key];
+    }
+    //returns the encripted variable with current key and iv
+    private function encrypt_again_password($password){ 
+        $login_data = json_decode(file_get_contents($this->config_file),true);
+        
+        $server_iv = base64_decode($login_data['iv']);
+        $server_key = base64_decode($login_data['key']);
+        
+        $password = base64_encode($password);
+
+        return openssl_encrypt($password, $this->cipher, $server_key, 0, $server_iv);
     }
     private function generate_password(){
         $pLen = 12;
