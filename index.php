@@ -36,7 +36,6 @@ Class RestaCart {
     private $cipher = 'AES-256-CBC';//the password cipher to save it to disk
     private $error_string = false; //it's false when it's not an error (very basic aproach)
     private $we_are_in = false; //are we logged?
-    private $session_variables = []; //I use this to avoid keeping the session opened (I just need to keep track of the login throught uploads)
 
     private $template = <<<TEMPLATE
 <!DOCTYPE html><html lang="{{HTML_LANG}}"><head><meta charset="utf-8">
@@ -85,7 +84,7 @@ TEMPLATE;
     }
     private function init(){
         session_start();
-        $this->session_variables = $_SESSION;
+        $this->we_are_in = $_SESSION['restacart'] ?? false;
         session_write_close();
         
         if($_SERVER['REQUEST_METHOD']=='POST' && isset($_POST['action'])){
@@ -158,8 +157,7 @@ TEMPLATE;
                 mkdir($this->file_folder, 0644);
             }
         }
-        //$this->current_step = 'LOGIN';
-        return $print_init_form;
+        return true;
     }
     private function start_login(){
         //I know this is weird, and have a lot of improvements for security, but I'm trying to
@@ -171,7 +169,9 @@ TEMPLATE;
         $original_password = $original_password_data['ciphertext'];
 
         if($current_password === $original_password){
-            die("WE ARE IN!!!!");
+            session_start();
+            $this->we_are_in = $_SESSION['restacart'] = true;
+            session_write_close();
         }
         $this->set_error('La contraseña no es válida. Lo siento.');
     }
@@ -534,7 +534,7 @@ class QRCode {
 
 		/* Don't cut off mid-character if exceeding capacity. */
 		$max_chars = $this->qr_capacity[$version - 1][$ecl][$mode];
-		if ($mode == 3) $max_chars <<= 1;
+		if ($mode == 3){ $max_chars <<= 1; }
 		$data = substr($data, 0, $max_chars);
 
 		/* Convert from character level to bit level. */
@@ -553,8 +553,8 @@ class QRCode {
 				break;
 		}
 
-		for ($i = 0; $i < 4; $i++) $code[] = 0;
-		while (count($code) % 8) $code[] = 0;
+		for ($i = 0; $i < 4; $i++){ $code[] = 0; }
+		while (count($code) % 8){ $code[] = 0; }
 
 		/* Convert from bit level to byte level. */
 		$data = array();
