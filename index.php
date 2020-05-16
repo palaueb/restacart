@@ -23,11 +23,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+
+TODO: multiple sessions (just give a unique session_name per installation)
 */
 
 /* coded while my kids drove the sofa throught the imagination, and with 2 glasses of wine. */
 Class RestaCart {
     public $file_folder = './files/';
+    public $config = [
+        'width'=>2244,//19cm*300ppp
+        'height'=>2244,//19cm*300ppp
+        'padding'=>118, //1cm*300ppp
+        'bg_color'=>'#FFFFFF',
+        'fg_color'=>'#000000'
+    ];
     
     private $config_file = '.config';
     private $export_variable_labels = ['{{HTML_LANG}}'];
@@ -73,7 +82,57 @@ input[type="reset"],input[type="submit"]{-webkit-appearance:button;cursor:pointe
 </body>
 </html>
 TEMPLATE;
-    public function __construct(){
+    private $login_form = <<<FORM
+<form method='post'>
+<div class="row">
+    <input type="hidden" name="action" value="login" />
+
+    <label class="two columns" for="password1">Contraseña:</label>
+    <input class="three columns" type='password' name='password1' id='password1' />
+    <input class="three columns" type='submit' value="Entrar" />
+</div>
+</form>
+FORM;
+private $register_form = <<<REGISTERFORM
+<form method='post'>
+<div class="row">
+    <div class="one-half column">
+        <div class="row">
+            <label class="one-half column" for="password1">Contraseña:</label>
+            <input class="one-half column" type='password' name='password1' id='password1' />
+        </div>
+        <div class="row">
+            <label class="one-half column" for="password2">Repite contraseña:</label>
+            <input class="one-half column" type='password' name='password2' id='password2' />
+        </div>
+        <div class="row">
+            <label class="one-half column">&nbsp;</label>
+            <input type="hidden" name="action" value="password" />
+            <input class="one-half column" type='submit' name='savepasswd' id='savepasswd' value="Guardar contraseña" />
+        </div>
+    </div>
+    <div class="one-half column">
+        <em>La contraseña tiene que contener al menos 12 carácteres, <br />por ejemplo: <span style='border:1px solid darkgray;background:lightgray;padding:0.2rem 1rem 0.2rem 0.5rem;'>{{RANDOM_PASSWORD}}</span>.<br />
+        <a href='https://www.004.es/password_security'>Algunos consejos para contraseñas seguras</a>.<br /> Ah! puedes usar espacios en medio.</em>
+    </div>
+</div>
+</form>
+REGISTERFORM;
+    public function __construct($config=false){
+        if($config !== false){
+            /* 
+            You can configure any parameter during the life of the 
+            script or you can initialize it with your own values 
+            * /
+            $this->config = [
+                'width'=>2244,//19cm*300ppp
+                'height'=>2244,//19cm*300ppp
+                'padding'=>118, //1cm*300ppp
+                'bg_color'=>'#FFFFFF',
+                'fg_color'=>'#000000'
+            ];
+            /* */
+        }
         $this->init();
     }
     public function run(){
@@ -100,8 +159,7 @@ TEMPLATE;
             return $this->print_init_login();
         }
         
-        die("WE ARE IN!");
-        //fill variables
+        $this->print_main_page();
     }
     private function process_post(){
         switch($_POST['action']){
@@ -110,9 +168,9 @@ TEMPLATE;
             case 'login':
                 return $this->start_login();
             case 'upload_file':
-                return false; //$this->upload_file();
-             case 'new_qr':
-                //return $this->create_qr();
+                return $this->upload_file();
+            case 'logout':
+                return $this->logout();
                 break;
             default:
                 die('this sucks!');
@@ -175,47 +233,62 @@ TEMPLATE;
         }
         $this->set_error('La contraseña no es válida. Lo siento.');
     }
+    private function upload_file(){
+        
+        $url = "https://www.thisdomain.com/this_path/files/nameoffile.ext";
+        $this->create_qr($url);
+    }
+    private function logout(){
+        session_start();
+        unset($_SESSION['restacart']);
+        session_write_close();
+    }
     private function print_headers(){
         //header("A: B");
         
         return false; # true for only headers
     }
     private function add_text($label, $text){
+        //this just adds text to the labels of the different possible templates
         $this->export_variable_labels[] = '{{'.$label.'}}';
         $this->export_variables[] = $text;
     }
-    private function set_error($error_string){
+    private function add_content($content){
+        $this->template = str_replace('{{OUTPUT_HTML}}',$content.PHP_EOL.'{{OUTPUT_HTML}}',$this->template);
+    }
+    private function set_error($error_string_argument){
         if($this->error_string === false){
-            $this->error_string = $error_string;
+            $this->error_string = $error_string_argument;
         }else{
-            $this->error_string .= $error_string;
+            $this->error_string .= $error_string_argument;
         }
     }
     private function get_error(){
         return $this->error_string;
     }
+    
+    
+    
+    //prints of the templates
+    /* 
+    while I want to maintain this in one page, I used this aproach.
+    I know there are more maintenable templates systems, for sure there will be
+    some single page, if you want to improve this app, I'm sure this are is one 
+    of the most in need of refactor.
+    */
     private function print_init_login(){
         $this->add_text('TITLE_PAGE','Bienvenido a RestaCart.');
-        $output .= "<h4>Introduce la contraseña para acceder a RestaCart:</h4>";
+        $this->add_content("<h4>Introduce la contraseña para acceder a RestaCart:</h4>");
 
-        $error_string = $this->get_error();
-        if($error_string !== false){
-            //$output .= $this->print_error($error_string);
-            $output .= "<div class='alert'><p>Error en los datos</p>";
-            $output .= $error_string."</div>";
+        $local_error_string = $this->get_error();
+        if($local_error_string !== false){
+            $output = "<div class='alert'><p>Error en los datos</p>";
+            $output .= $local_error_string."</div>";
+            $this->add_content($output);
         }
-$form = <<<FORM
-<form method='post'>
-<div class="row">
-    <input type="hidden" name="action" value="login" />
 
-    <label class="two columns" for="password1">Contraseña:</label>
-    <input class="three columns" type='password' name='password1' id='password1' />
-    <input class="three columns" type='submit' value="Entrar" />
-</div>
-</form>
-FORM;
-        $this->add_text('OUTPUT_HTML',$output.$form);
+        $this->add_content($this->login_form);
+
         return true;
     }
     private function print_init_setup(){
@@ -228,56 +301,40 @@ FORM;
             $output .= "<div class='alert'><p>No tengo permisos para guardar ficheros en el servidor</p>";
             $output .= "<p>Necesito tener permisos de escritura para la carpeta $current_folder/</p><p>▶️ Si lo sabes hacer dale permisos de escritura para la carpeta al usuario del servidor web.</p><p>▶️ Si no lo sabes hacer, contacta con quien lleva el alojamiento de tu página web y leele este mensaje.</p></div>";
         }
-        /* */
-        $random_password = $this->generate_password();
+        
         $output .= "<p>Vamos a configurar una contraseña para esta página.</p>";
         
-        $error_string = $this->get_error();
-        if($error_string !== false){
-            //$output .= $this->print_error($error_string);
+        $local_error_string = $this->get_error();
+        if($local_error_string !== false){
             $output .= "<div class='alert'><p>Error en los datos</p>";
-            $output .= $error_string."</div>";
+            $output .= $local_error_string."</div>";
         }
+        $this->add_content($output);
+        $this->add_content($this->register_form);
         
-$form = <<<FORM
-<form method='post'>
-
-
-<div class="row">
-    <div class="one-half column">
-        <div class="row">
-            <label class="one-half column" for="password1">Contraseña:</label>
-            <input class="one-half column" type='password' name='password1' id='password1' />
-        </div>
-        <div class="row">
-            <label class="one-half column" for="password2">Repite contraseña:</label>
-            <input class="one-half column" type='password' name='password2' id='password2' />
-        </div>
-        <div class="row">
-            <label class="one-half column">&nbsp;</label>
-            <input type="hidden" name="action" value="password" />
-            <input class="one-half column" type='submit' name='savepasswd' id='savepasswd' value="Guardar contraseña" />
-        </div>
-    </div>
-    <div class="one-half column">
-        <em>La contraseña tiene que contener al menos 12 carácteres, <br />por ejemplo: <span style='border:1px solid darkgray;background:lightgray;padding:0.2rem 1rem 0.2rem 0.5rem;'>$random_password</span>.<br />
-        <a href='https://www.004.es/password_security'>Algunos consejos para contraseñas seguras</a>.<br /> Ah! puedes usar espacios en medio.</em>
-    </div>
-</div>
-
-</form>
-FORM;
-        /* */
-        $output .= $form;
+        $this->add_text('RANDOM_PASSWORD',$this->generate_password());
         
-        $this->add_text('OUTPUT_HTML',$output);
-
+        
         return true;
     }
-    private function export(){
-        return str_replace($this->export_variable_labels,$this->export_variables,$this->template);
+    private function print_main_page(){
+        $this->add_text('TITLE_PAGE','Configuración de RestaCart.');
+        
+        $this->add_content("<h4>List of elements</h4>");
+        $elements_list = "BIG ELEMENTS LIST!";
+        $this->add_content($elements_list);
+        
+        return true;
     }
     
+    
+    
+    
+    
+    private function export(){
+        $output = str_replace($this->export_variable_labels,$this->export_variables,$this->template);
+        return str_replace('{{OUTPUT_HTML}} ','',$output);
+    }
     private function encrypt_password($password){
         $password = base64_encode($password);
 
@@ -310,8 +367,27 @@ FORM;
         }
         return $pass;
     }
+
+    
+    private function create_qr($url){
+        $options = [
+            "s"=>"qr-q",
+            "w"=>$this->config['width'], //19cm * 300ppp,
+            "h"=>$this->config['height'], //19cm * 300ppp,
+            "p"=>$this->config['padding'], //1cm*300ppp
+            "bc"=>$this->config['bg_color'],
+            "fc"=>$this->config['fg_color']
+        
+            
+        ];
+        $generator = new QRCode($url, $options);
+        $image = $generator->render_image();
+        echo $image;
+        //save $image where it must GO!
+		//imagepng($image);
+		//imagedestroy($image);
+    }
     public function print_qr(){
-        $options = ["s"=>"qr-q"];
 /*
 s - Symbology (type of QR code). One of:
     qr
@@ -338,6 +414,7 @@ md - Module density. A number between 0 and 1. Default is 1.
 wq - Width of quiet area units. Default is 1. Use 0 to suppress quiet area.
 wm - Width of narrow modules and spaces. Default is 1.
 */
+        $options = ["s"=>"qr-q"];
         $generator = new QRCode('https://www.github.com/palaueb/restacart/', $options);
         $generator->output_image();
         exit(0);
