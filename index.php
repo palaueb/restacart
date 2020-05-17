@@ -29,15 +29,21 @@ TODO: multiple sessions (just give a unique session_name per installation)
 
 /* coded while my kids drove the sofa throught the imagination, and with 2 glasses of wine. */
 Class RestaCart {
-    public $file_folder = './files/';
     public $config = [
-        'width'=>2244,//19cm*300ppp
-        'height'=>2244,//19cm*300ppp
-        'padding'=>118, //1cm*300ppp
-        'bg_color'=>'#FFFFFF',
-        'fg_color'=>'#000000'
+        'file_folder' => 'files/',
+        'width'     =>2244,//19cm*300ppp
+        'height'    =>2244,//19cm*300ppp
+        'padding'   =>118, //1cm*300ppp
+        'bg_color'  =>'#FFFFFF',
+        'fg_color'  =>'#000000'
     ];
-    
+    public $allowed_files = array(
+        "gif" => ["image/gif"],
+        "jpeg"=> ["image/jpeg","image/pjpeg"],
+        "jpg" => ["image/jpeg","image/pjpeg"],
+        "png" => ["image/png"],
+        "pdf" => ["application/pdf"]
+    );
     private $config_file = '.config';
     private $export_variable_labels = ['{{HTML_LANG}}'];
     private $export_variables = ['es'];
@@ -120,10 +126,30 @@ private $register_form = <<<REGISTERFORM
 </form>
 REGISTERFORM;
     private $upload_form = <<<UPLOADFORM
-<form>
-    <input type="hidden" name="action" value="upload_file" />
-    <input type="file" name="file" />
+
+<p>Pulsa el botón 'Examinar' para buscar en tu galería o ordenador el fichero que quieres que vean tus clientes al escanear el código QR.</p>
+<form method="post" enctype="multipart/form-data">
+<input type="hidden" name="action" value="upload_file" />
+
+<div class="row">
+    <label class="three columns" for="label">Etiqueta de la carta:</label>
+    <input class="five columns" type="text" name="label" id="label" />
+</div>
+<div class="row">
+    <label class="three columns" for="upload_file">Seleccionar la carta:</label>
+    <input class="five columns" type="file" name="upload_file" id="upload_file" />
+</div>
+<div class="row">
+    <label class="three columns">&nbsp;</label>    
+    <input class="five columns" type='submit' name='uploadbutton' id='uploadbutton' value="Añadir carta y generar QR" />
+</div>
+
+    
+    
+    
 </form>
+
+
 UPLOADFORM;
     public function __construct($config=false){
         if($config !== false){
@@ -171,17 +197,21 @@ UPLOADFORM;
     private function process_post(){
         switch($_POST['action']){
             case 'password':
-                return $this->setup_password();
+                $this->setup_password();
+                break;
             case 'login':
-                return $this->start_login();
+                $this->start_login();
+                break;
             case 'upload_file':
-                return $this->upload_file();
+                $this->upload_file();
+                break;
             case 'logout':
-                return $this->logout();
+                $this->logout();
                 break;
             default:
                 die('this sucks!');
          }
+         return true;
     }
     private function setup_password(){
         if(file_exists('.htaccess') || file_exists($this->config_file)){ return false; }
@@ -216,10 +246,13 @@ UPLOADFORM;
             //Create the .htaccess to avoid access to any dot file (.config, .git, .anything)
             $htaccess_data = "RedirectMatch 404 /\..*$";
             file_put_contents('.htaccess', $htaccess_data);
-            
+
             //create the folder for uploaded files
-            if(!is_dir($this->file_folder)){
-                mkdir($this->file_folder, 0644);
+            if(!is_dir($this->config['file_folder'])){
+                // Due to the diversity of hostings and configurations, at this starting point
+                // we will use a insecure but working 777 permision for files folder
+                // TODO: refactor to work with almost any hosting without 777.
+                mkdir($this->config['file_folder'], 0777);
             }
         }
         return true;
@@ -241,9 +274,62 @@ UPLOADFORM;
         $this->set_error('La contraseña no es válida. Lo siento.');
     }
     private function upload_file(){
+        $upload_file = $_FILES['upload_file'];
+        $label = preg_replace('/[<>%&*{}"\']/','',$_POST['label']);
+        $type = $upload_file['type'];
+        $parts_extension = explode(".", $upload_file["name"]);
+        $extension = end($parts_extension);
+
+        $accepted_by_type = $this->allowed_files[$extension];
         
-        $url = "https://www.thisdomain.com/this_path/files/nameoffile.ext";
-        $this->create_qr($url);
+        $we_are_ok = true;
+        
+        $error_code = $upload_file['error'];
+        if($error_code != 0){
+            $we_are_ok = false;
+
+            $this->set_error("📖 Hay un error en la subida del fichero, código de error [$error_code].");
+        }
+        if(!isset($accepted_by_type) || !in_array($type, $accepted_by_type)){
+            $we_are_ok = false;
+
+            $permited_types = "";
+            foreach($this->allowed_files as $kind => $mime){
+                $permited_types .= ".$kind, ";
+            }
+            $error_type = isset($accepted_by_type) ? 1 : 2;
+            $this->set_error("📖 ($extension - $type) El fichero que has enviado no es del tipo de ficheros permitidos: ".substr($permited_types,0,-2)." [$error_type].");
+        }
+
+        if($we_are_ok){
+            $basic_time = time();
+            $filename = $basic_time . '.' . $extension;
+            $destination = $this->config['file_folder'] . $filename;
+
+            move_uploaded_file($upload_file['tmp_name'], $destination);
+            chmod($destination,0777);
+            
+            $current_path = $_SERVER['SCRIPT_URI'];
+            $url = $current_path.$destination;
+            $qr_path = $this->config['file_folder'].'qr_'.round(rand()*100000).'_'.$basic_time.'.png';
+            if(!$this->create_qr($url, $qr_path)){
+                $this->set_error('El QR no se ha podido generar correctamente.');
+            }
+            
+            
+            $current_data = [
+                'original_name'=>$upload_file["name"],
+                'menu_url'=>$url,
+                'qr_path'=>$qr_path,
+                'label'=>$label
+                //here goes more future information
+            ];
+            //TODO: move this to his own folder of configs
+            file_put_contents('.info_'.$basic_time.'.json', json_encode($current_data));
+            die($url);
+        }
+
+
     }
     private function logout(){
         session_start();
@@ -327,18 +413,29 @@ UPLOADFORM;
     private function print_main_page(){
         $this->add_text('TITLE_PAGE','Configuración de RestaCart.');
         
-        $this->add_content("<h4>Listado de cartas</h4>");
-        $elements_list = "<div class='container'><ul class='row'><li class='twelve columns'><div>JUST A LIST OF ROWS</div></li><li class='twelve columns'><div>MORE CONTENT</div></li></div>";
+        $this->add_content("<h4>Listado de cartas con código QR</h4>");
+        $elements_list = "<div class='container'><ul class='row'>";
+        
+        $config_files = $this->get_config_files();
+        foreach($config_files as $config_file){
+            $data_menu = $this->load_config_file($config_file);
+            $elements_list .= "<li class='twelve columns'><div>JUST A LIST OF ROWS</div></li>";
+        }
+        
+        $elements_list .= "</ul></div>";
+        
         $this->add_content($elements_list);
 
-        $this->add_content("<h4>Añadir nueva carta</h4>");
+        $this->add_content("<h4>Añadir carta para generar el QR</h4>");
+        $local_error_string = $this->get_error();
+        if($local_error_string !== false){
+            $output = "<div class='alert'><p>Error al subir la carta.</p>";
+            $output .= $local_error_string."</div>";
+            $this->add_content($output);
+        }
         $this->add_content($this->upload_form);
         return true;
     }
-    
-    
-    
-    
     
     private function export(){
         $output = str_replace($this->export_variable_labels,$this->export_variables,$this->template);
@@ -376,9 +473,22 @@ UPLOADFORM;
         }
         return $pass;
     }
-
-    
-    private function create_qr($url){
+    private function get_config_files(){
+        $scan = scandir('.');
+        $output_files = [];
+        foreach($scan as $file){
+            if(substr($file,0,6)=='.info_'){
+                $output_files[] = $file;
+            }
+        }
+        return $output_files;
+    }
+    private function load_config_file($filename){
+        $data = file_get_contents($filename);
+        $json = json_decode($data,true);
+        return $json; //as array
+    }
+    private function create_qr($url, $qr_path){
         $options = [
             "s"=>"qr-q",
             "w"=>$this->config['width'], //19cm * 300ppp,
@@ -386,15 +496,14 @@ UPLOADFORM;
             "p"=>$this->config['padding'], //1cm*300ppp
             "bc"=>$this->config['bg_color'],
             "fc"=>$this->config['fg_color']
-        
-            
         ];
         $generator = new QRCode($url, $options);
         $image = $generator->render_image();
-        echo $image;
-        //save $image where it must GO!
-		//imagepng($image);
-		//imagedestroy($image);
+        imagetruecolortopalette($image, false, 4);
+        imagepng($image, $qr_path, 0);
+
+        // TODO: return the right error message in case it fails
+        return true;
     }
     public function print_qr(){
 /*
