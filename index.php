@@ -318,6 +318,7 @@ UPLOADFORM;
             
             
             $current_data = [
+                'id'=>$basic_time, //TODO: unique ID, time is not a good idea on a shared space, but this is for single persons... not pro enought.
                 'original_name'=>$upload_file["name"],
                 'menu_url'=>$url,
                 'qr_path'=>$qr_path,
@@ -423,6 +424,8 @@ UPLOADFORM;
             $elements_list .= "     <h5>".$data_menu['label']."</h5>"; //name in title
             $elements_list .= "     <p>Carta añadida el dia ".$data_menu['date']."</p>";
             $elements_list .= "     <p><a href='".$data_menu['menu_url']."'>Descargar el fichero que visualizan los clientes: ".$data_menu['original_name']."</a></p>";
+            //TODO: delete element
+            //$elements_list .= "     <form method='post'><input type='hidden' name='element_id' value='".$data_menu['id']."' /><input type='submit' value='Eliminar carta' /></form";
             $elements_list .= " </div>";
             $elements_list .= " <div class='four columns'><a href='".$data_menu['qr_path']."'><img src='".$data_menu['qr_path']."' style='width:100%' /></a></div>";
             $elements_list .= "</div>";
