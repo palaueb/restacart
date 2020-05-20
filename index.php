@@ -25,18 +25,23 @@ SOFTWARE.
 
 
 TODO: multiple sessions (just give a unique session_name per installation)
+BUG: al hacer el registro-primer login, lanza mensaje que ha dado error subir la carta
+TODO: permitir subir un LINK en lugar de un fichero (por si la carta ya está online)
+TODO: Revisar si hay una nueva versión cada vez que se entre en el admin
+TODO: delete button to delete a cart
+TODO: stats for QR scannings
 */
 
 /* coded while my kids drove the sofa throught the imagination, and with 2 glasses of wine. */
 Class RestaCart {
-    public $config = [
+    public $config = array(
         'file_folder' => 'files/',
         'width'     =>2244,//19cm*300ppp
         'height'    =>2244,//19cm*300ppp
         'padding'   =>118, //1cm*300ppp
         'bg_color'  =>'#FFFFFF',
         'fg_color'  =>'#000000'
-    ];
+    );
     public $allowed_files = array(
         "gif" => ["image/gif"],
         "jpeg"=> ["image/jpeg","image/pjpeg"],
@@ -45,11 +50,13 @@ Class RestaCart {
         "pdf" => ["application/pdf"]
     );
     private $config_file = '.config';
+    private $config_folder = './.configs/';
     private $export_variable_labels = ['{{HTML_LANG}}'];
     private $export_variables = ['es'];
     private $output_html = "DEFAULT TEXT"; //at this time this must be deleted
     private $cipher = 'AES-256-CBC';//the password cipher to save it to disk
     private $error_string = false; //it's false when it's not an error (very basic aproach)
+    private $ok_message_string = false; //same as above
     private $we_are_in = false; //are we logged?
 
     private $template = <<<TEMPLATE
@@ -62,21 +69,20 @@ html{font-family:sans-serif;-ms-text-size-adjust:100%;-webkit-text-size-adjust:1
 input[type="reset"],input[type="submit"]{-webkit-appearance:button;cursor:pointer}button[disabled],html input[disabled]{cursor:default}button::-moz-focus-inner,input::-moz-focus-inner{border:0;padding:0}input{line-height:normal}input[type="checkbox"],input[type="radio"]{box-sizing:border-box;padding:0}input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{height:auto}input[type="search"]{-webkit-appearance:textfield;-moz-box-sizing:content-box;-webkit-box-sizing:content-box;box-sizing:content-box}input[type="search"]::-webkit-search-cancel-button,input[type="search"]::-webkit-search-decoration{-webkit-appearance:none}fieldset{border:1px solid silver;margin:0 2px;padding:.35em .625em .75em}legend{border:0;padding:0}textarea{overflow:auto}optgroup{font-weight:700}table{border-collapse:collapse;border-spacing:0}td,th{padding:0}
 .container{position:relative;width:100%;max-width:960px;margin:0 auto;padding:0 20px;box-sizing:border-box}.column,.columns{width:100%;float:left;box-sizing:border-box}@media (min-width: 400px){.container{width:85%;padding:0}}@media (min-width: 550px){.container{width:80%}.column,.columns{margin-left:4%}.column:first-child,.columns:first-child{margin-left:0}.one.column,.one.columns{width:4.66666666667%}.two.columns{width:13.3333333333%}.three.columns{width:22%}.four.columns{width:30.6666666667%}.five.columns{width:39.3333333333%}.six.columns{width:48%}.seven.columns{width:56.6666666667%}.eight.columns{width:65.3333333333%}.nine.columns{width:74%}.ten.columns{width:82.6666666667%}.eleven.columns{width:91.3333333333%}.twelve.columns{width:100%;margin-left:0}.one-third.column{width:30.6666666667%}.two-thirds.column{width:65.3333333333%}.one-half.column{width:48%}.offset-by-one.column,.offset-by-one.columns{margin-left:8.66666666667%}.offset-by-two.column,.offset-by-two.columns{margin-left:17.3333333333%}.offset-by-three.column,.offset-by-three.columns{margin-left:26%}.offset-by-four.column,.offset-by-four.columns{margin-left:34.6666666667%}.offset-by-five.column,.offset-by-five.columns{margin-left:43.3333333333%}.offset-by-six.column,.offset-by-six.columns{margin-left:52%}.offset-by-seven.column,.offset-by-seven.columns{margin-left:60.6666666667%}.offset-by-eight.column,.offset-by-eight.columns{margin-left:69.3333333333%}.offset-by-nine.column,.offset-by-nine.columns{margin-left:78%}.offset-by-ten.column,.offset-by-ten.columns{margin-left:86.6666666667%}.offset-by-eleven.column,.offset-by-eleven.columns{margin-left:95.3333333333%}.offset-by-one-third.column,.offset-by-one-third.columns{margin-left:34.6666666667%}.offset-by-two-thirds.column,.offset-by-two-thirds.columns{margin-left:69.3333333333%}.offset-by-one-half.column,.offset-by-one-half.columns{margin-left:52%}}html{font-size:62.5%}body{font-size:1.5em;line-height:1.6;font-weight:400;font-family:"Raleway","HelveticaNeue","Helvetica Neue",Helvetica,Arial,sans-serif;color:#222}h1,h2,h3,h4,h5,h6{margin-top:0;margin-bottom:2rem;font-weight:300}h1{font-size:4rem;line-height:1.2;letter-spacing:-.1rem}h2{font-size:3.6rem;line-height:1.25;letter-spacing:-.1rem}h3{font-size:3rem;line-height:1.3;letter-spacing:-.1rem}h4{font-size:2.4rem;line-height:1.35;letter-spacing:-.08rem}h5{font-size:1.8rem;line-height:1.5;letter-spacing:-.05rem}h6{font-size:1.5rem;line-height:1.6;letter-spacing:0}@media (min-width: 550px){h1{font-size:5rem}h2{font-size:4.2rem}h3{font-size:3.6rem}h4{font-size:3rem}h5{font-size:2.4rem}h6{font-size:1.5rem}}p{margin-top:0}a{color:#1EAEDB}a:hover{color:#0FA0CE}.button,button,input[type="submit"],input[type="reset"],input[type="button"]{display:inline-block;height:38px;padding:0 30px;color:#555;text-align:center;font-size:11px;font-weight:600;line-height:38px;letter-spacing:.1rem;text-transform:uppercase;text-decoration:none;white-space:nowrap;background-color:transparent;border-radius:4px;border:1px solid #bbb;cursor:pointer;box-sizing:border-box}.button:hover,button:hover,input[type="submit"]:hover,input[type="reset"]:hover,input[type="button"]:hover,.button:focus,button:focus,input[type="submit"]:focus,input[type="reset"]:focus,input[type="button"]:focus{color:#333;border-color:#888;outline:0}.button.button-primary,button.button-primary,input[type="submit"].button-primary,input[type="reset"].button-primary,input[type="button"].button-primary{color:#FFF;background-color:#33C3F0;border-color:#33C3F0}.button.button-primary:hover,button.button-primary:hover,input[type="submit"].button-primary:hover,input[type="reset"].button-primary:hover,input[type="button"].button-primary:hover,.button.button-primary:focus,button.button-primary:focus,input[type="submit"].button-primary:focus,input[type="reset"].button-primary:focus,input[type="button"].button-primary:focus{color:#FFF;background-color:#1EAEDB;border-color:#1EAEDB}input[type="email"],input[type="number"],input[type="search"],input[type="text"],input[type="tel"],input[type="url"],input[type="password"],textarea,select{height:38px;padding:6px 10px;background-color:#fff;border:1px solid #D1D1D1;border-radius:4px;box-shadow:none;box-sizing:border-box}input[type="email"],input[type="number"],input[type="search"],input[type="text"],input[type="tel"],input[type="url"],input[type="password"],textarea{-webkit-appearance:none;-moz-appearance:none;appearance:none}textarea{min-height:65px;padding-top:6px;padding-bottom:6px}input[type="email"]:focus,input[type="number"]:focus,input[type="search"]:focus,input[type="text"]:focus,input[type="tel"]:focus,input[type="url"]:focus,input[type="password"]:focus,textarea:focus,select:focus{border:1px solid #33C3F0;outline:0}label,legend{display:block;margin-bottom:.5rem;font-weight:600}fieldset{padding:0;border-width:0}input[type="checkbox"],input[type="radio"]{display:inline}label > .label-body{display:inline-block;margin-left:.5rem;font-weight:400}ul{list-style:circle inside}ol{list-style:decimal inside}ol,ul{padding-left:0;margin-top:0}ul ul,ul ol,ol ol,ol ul{margin:1.5rem 0 1.5rem 3rem;font-size:90%}li{margin-bottom:1rem}code{padding:.2rem .5rem;margin:0 .2rem;font-size:90%;white-space:nowrap;background:#F1F1F1;border:1px solid #E1E1E1;border-radius:4px}pre > code{display:block;padding:1rem 1.5rem;white-space:pre}th,td{padding:12px 15px;text-align:left;border-bottom:1px solid #E1E1E1}th:first-child,td:first-child{padding-left:0}th:last-child,td:last-child{padding-right:0}button,.button{margin-bottom:1rem}input,textarea,select,fieldset{margin-bottom:1.5rem}pre,blockquote,dl,figure,table,p,ul,ol,form{margin-bottom:1.5rem}.u-full-width{width:100%;box-sizing:border-box}.u-max-full-width{max-width:100%;box-sizing:border-box}.u-pull-right{float:right}.u-pull-left{float:left}hr{margin-top:3rem;margin-bottom:3.5rem;border-width:0;border-top:1px solid #E1E1E1}.container:after,.row:after,.u-cf{content:"";display:table;clear:both}
 ul,li{list-style-type: none;}
-.alert{
-    border:0.2em solid #d77c7c;
-    border-radius:2em;
-    padding:1em;
-    margin-bottom: 2.5rem;
-    background:rgb(254,198,198);background: linear-gradient(180deg, rgba(254,198,198,1) 0%, rgba(215,124,124,1) 100%);
-}
-.alert a{
-    color:darkred;
-}
+
+.alert{border:0.2em solid #d77c7c;border-radius:2em;padding:1em;margin-bottom: 2.5rem;background:rgb(254,198,198);background: linear-gradient(180deg, rgba(254,198,198,1) 0%, rgba(215,124,124,1) 100%);}
+.alert a{color:darkred;}
 .alert p:first-child{font-weight:bold;}
-.alert p:first-child::before {
-    content: "⚠️ ";
-  }
+.alert p:first-child::before {content: "⚠️ ";}
 .alert p:last-child{margin-bottom:0;}
+
+.ok_message{border:0.2em solid #7cd787;border-radius:2em;padding:1em;margin-bottom: 2.5rem;background: rgb(208,255,211);background: linear-gradient(180deg, rgba(208,255,211,1) 0%, rgba(124,215,135,1) 100%);}
+.ok_message a{color:darkgreen;}
+.ok_message p:first-child{font-weight:bold;}
+.ok_message p:first-child::before {content: "👍 ";}
+.ok_message p:last-child{margin-bottom:0;}
+
+div#logout_form{position: absolute;right: 0;top: 0;margin-top: 10%;}
 </style></head><body>
     <div class="container">
     <div class="row">
@@ -151,7 +157,18 @@ REGISTERFORM;
 
 
 UPLOADFORM;
+private $logout_form = <<<LOGOUTFORM
+<div id="logout_form">
+<form method="POST">
+  <input type="hidden" name="action" value="logout" />
+  <input type="submit" name="logout" value="Cerrar sesión" />
+</form>
+</div>
+LOGOUTFORM;
     public function __construct($config=false){
+        if (version_compare(PHP_VERSION, '7.0.0', '<')) {
+            echo 'Necesito la versión de PHP 7.0 o superior. Versión actual:' . PHP_VERSION;
+        }
         if($config !== false){
             /* 
             You can configure any parameter during the life of the 
@@ -197,21 +214,19 @@ UPLOADFORM;
     private function process_post(){
         switch($_POST['action']){
             case 'password':
-                $this->setup_password();
-                break;
+                return $this->setup_password();
             case 'login':
-                $this->start_login();
-                break;
+                return $this->start_login();
             case 'upload_file':
-                $this->upload_file();
-                break;
+                return $this->upload_file();
             case 'logout':
-                $this->logout();
-                break;
+                return $this->logout();
+            case 'delete_menu':
+                return $this->delete_menu();
             default:
                 die('this sucks!');
          }
-         return true;
+         return false;
     }
     private function setup_password(){
         if(file_exists('.htaccess') || file_exists($this->config_file)){ return false; }
@@ -253,6 +268,8 @@ UPLOADFORM;
                 // we will use a insecure but working 777 permision for files folder
                 // TODO: refactor to work with almost any hosting without 777.
                 mkdir($this->config['file_folder'], 0777);
+                mkdir($this->config_folder, 0777);
+                
             }
         }
         return true;
@@ -270,8 +287,9 @@ UPLOADFORM;
             session_start();
             $this->we_are_in = $_SESSION['restacart'] = true;
             session_write_close();
+        }else{
+            $this->set_error('La contraseña no es válida. Lo siento.');
         }
-        $this->set_error('La contraseña no es válida. Lo siento.');
     }
     private function upload_file(){
         $upload_file = $_FILES['upload_file'];
@@ -309,7 +327,7 @@ UPLOADFORM;
             move_uploaded_file($upload_file['tmp_name'], $destination);
             chmod($destination,0777);
             
-            $current_path = $_SERVER['SCRIPT_URI'];
+            $current_path = Tools::get_url();
             $url = $current_path.$destination;
             $qr_path = $this->config['file_folder'].'qr_'.round(rand(0,100000)).'_'.$basic_time.'.png';
             if(!$this->create_qr($url, $qr_path)){
@@ -325,15 +343,42 @@ UPLOADFORM;
                 'label'=>$label,
                 'date'=>date('d/m/Y',$basic_time)
             ];
-            //TODO: move this to his own folder of configs
-            file_put_contents('.info_'.$basic_time.'.json', json_encode($current_data));
+            file_put_contents($this->config_folder.'.info_'.$basic_time.'.json', json_encode($current_data));
+            
+            $this->set_ok_message("He guardado la carta en un lugar seguro y he generado el QR para que lo puedas usar. Revisa el listado de cartas.");
         }
     }
     private function logout(){
         session_start();
         unset($_SESSION['restacart']);
         session_write_close();
+        
+        $self=$_SERVER['PHP_SELF'];
+        header("Location: ".$self);
+        exit(0);
     }
+    private function delete_menu(){
+        $element_id = $_POST['element_id'];
+        if(preg_match("/[0-9]{10}/",$element_id)){
+            $data = $this->load_config_file($this->config_folder.'.info_'.$element_id.'.json');
+            if($data===false){ return false; }
+            $qr_path = $data['qr_path'];
+            $id = $data['id'];
+            
+            $exp = explode("/",$data['menu_url']);
+            $filename = end($exp);
+            $menu_path = $this->config['file_folder'].$filename;
+            unlink($menu_path); //delete the menu file
+            unlink($qr_path); //delete the QR png file
+            unlink($this->config_folder.'.info_'.$id.'.json');//delete the metadata json file
+            
+            $this->set_ok_message('He podido eliminar la carta sin liarla 👍.');
+            return true;
+        }
+        die("WHAT R U DOING SON OF A GARGOYLE?");
+    }
+    //END POST FUNCTIONS
+    
     private function print_headers(){
         //header("A: B");
         
@@ -346,6 +391,16 @@ UPLOADFORM;
     }
     private function add_content($content){
         $this->template = str_replace('{{OUTPUT_HTML}}',$content.PHP_EOL.'{{OUTPUT_HTML}}',$this->template);
+    }
+    private function set_ok_message($ok_message_argument){
+        if($this->ok_message_string === false){
+            $this->ok_message_string = $ok_message_argument;
+        }else{
+            $this->ok_message_string .= $ok_message_argument;
+        }
+    }
+    private function get_ok_message(){
+        return $this->ok_message_string;
     }
     private function set_error($error_string_argument){
         if($this->error_string === false){
@@ -411,9 +466,30 @@ UPLOADFORM;
     private function print_main_page(){
         $this->add_text('TITLE_PAGE','Configuración de RestaCart.');
         
+        $this->add_content($this->logout_form);
+        
+        
+        //Error message
+        $local_error_string = $this->get_error();
+        if($local_error_string !== false){
+            $output = "<div class='alert'><p>Error al subir la carta.</p>";
+            $output .= $local_error_string."</div>";
+            $this->add_content($output);
+        }
+        //something right message
+        $local_ok_message_string = $this->get_ok_message();
+        if($local_ok_message_string !== false){
+            $output = "<div class='ok_message'><p>Algo ha ido bien.</p>";
+            $output .= $local_ok_message_string."</div>";
+            $this->add_content($output);
+        }
+        ##ADD MENU part
+        $this->add_content("<h4>Añadir carta para generar el QR</h4>");
+        $this->add_content($this->upload_form);
+        
+        ##LIST MENU part
         $this->add_content("<h4>Listado de cartas con código QR</h4>");
         $elements_list = "<div><ul>";
-        
         $config_files = $this->get_config_files();
         foreach($config_files as $config_file){
             $data_menu = $this->load_config_file($config_file);
@@ -423,9 +499,9 @@ UPLOADFORM;
             $elements_list .= " <div class='eight columns'>";
             $elements_list .= "     <h5>".$data_menu['label']."</h5>"; //name in title
             $elements_list .= "     <p>Carta añadida el dia ".$data_menu['date']."</p>";
-            $elements_list .= "     <p><a href='".$data_menu['menu_url']."'>Descargar el fichero que visualizan los clientes: ".$data_menu['original_name']."</a></p>";
+            $elements_list .= "     <p>Donde apunta el QR: <br />".$data_menu['menu_url']."<br />Ver carta: <a href='".$data_menu['menu_url']."'>".$data_menu['original_name']."</a></p>";
             //TODO: delete element
-            //$elements_list .= "     <form method='post'><input type='hidden' name='element_id' value='".$data_menu['id']."' /><input type='submit' value='Eliminar carta' /></form";
+            $elements_list .= "     <form method='post' onsubmit='return confirm(\"¿Estás seguro que deseas borrar la carta ".$data_menu['original_name']."?\")'><input type='hidden' name='action' value='delete_menu' /><input type='hidden' name='element_id' value='".$data_menu['id']."' /><input type='submit' value='Eliminar carta' /></form>";
             $elements_list .= " </div>";
             $elements_list .= " <div class='four columns'><a href='".$data_menu['qr_path']."'><img src='".$data_menu['qr_path']."' style='width:100%' /></a></div>";
             $elements_list .= "</div>";
@@ -437,16 +513,13 @@ UPLOADFORM;
         
         $this->add_content($elements_list);
 
-        $this->add_content("<h4>Añadir carta para generar el QR</h4>");
-        $local_error_string = $this->get_error();
-        if($local_error_string !== false){
-            $output = "<div class='alert'><p>Error al subir la carta.</p>";
-            $output .= $local_error_string."</div>";
-            $this->add_content($output);
-        }
-        $this->add_content($this->upload_form);
+
         return true;
     }
+    
+    
+    
+    
     
     private function export(){
         $output = str_replace($this->export_variable_labels,$this->export_variables,$this->template);
@@ -485,19 +558,19 @@ UPLOADFORM;
         return $pass;
     }
     private function get_config_files(){
-        $scan = scandir('.');
+        $scan = scandir($this->config_folder);
         $output_files = [];
         foreach($scan as $file){
             if(substr($file,0,6)=='.info_'){
-                $output_files[] = $file;
+                $output_files[] = $this->config_folder.$file;
             }
         }
         return $output_files;
     }
     private function load_config_file($filename){
-        $data = file_get_contents($filename);
-        $json = json_decode($data,true);
-        return $json; //as array
+        $data = @file_get_contents($filename);
+        if($data===false){ return false; }
+        return json_decode($data,true); //as array
     }
     private function create_qr($url, $qr_path){
         $options = [
@@ -555,33 +628,44 @@ $restacart = new RestaCart();
 $restacart->run();
 
 
-
+/* TOOLS */
+Class Tools{
+    static function get_url() {
+        //YEAH, go to stackoverflow and search something better than this $#!+
+        $protocol = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+        $self = $_SERVER['PHP_SELF'];
+        $exp = explode('/',$self);
+        $me = end($exp);
+        $where = str_replace($me,'',$self);
+        return $protocol.$_SERVER['HTTP_HOST'].$where;
+     }
+}
 
 //This QR Class comes from https://github.com/psyon/php-qrcode
 /****************************************************************************\
 
-qrcode.php - Generate QR Codes. MIT license.
+    qrcode.php - Generate QR Codes. MIT license.
 
-Copyright for portions of this project are held by Kreative Software, 2016-2018.
-All other copyright for the project are held by Donald Becker, 2019
+    Copyright for portions of this project are held by Kreative Software, 2016-2018.
+    All other copyright for the project are held by Donald Becker, 2019
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
 
 \****************************************************************************/
 class QRCode {
