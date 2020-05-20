@@ -25,18 +25,23 @@ SOFTWARE.
 
 
 TODO: multiple sessions (just give a unique session_name per installation)
+BUG: al hacer el registro-primer login, lanza mensaje que ha dado error subir la carta
+TODO: permitir subir un LINK en lugar de un fichero (por si la carta ya está online)
+TODO: Revisar si hay una nueva versión cada vez que se entre en el admin
+TODO: delete button to delete a cart
+TODO: stats for QR scannings
 */
 
 /* coded while my kids drove the sofa throught the imagination, and with 2 glasses of wine. */
 Class RestaCart {
-    public $config = [
+    public $config = array(
         'file_folder' => 'files/',
         'width'     =>2244,//19cm*300ppp
         'height'    =>2244,//19cm*300ppp
         'padding'   =>118, //1cm*300ppp
         'bg_color'  =>'#FFFFFF',
         'fg_color'  =>'#000000'
-    ];
+    );
     public $allowed_files = array(
         "gif" => ["image/gif"],
         "jpeg"=> ["image/jpeg","image/pjpeg"],
@@ -152,6 +157,9 @@ REGISTERFORM;
 
 UPLOADFORM;
     public function __construct($config=false){
+        if (version_compare(PHP_VERSION, '7.0.0', '<')) {
+            echo 'Necesito la versión de PHP 7.0 o superior. Versión actual:' . PHP_VERSION;
+        }
         if($config !== false){
             /* 
             You can configure any parameter during the life of the 
@@ -309,7 +317,7 @@ UPLOADFORM;
             move_uploaded_file($upload_file['tmp_name'], $destination);
             chmod($destination,0777);
             
-            $current_path = $_SERVER['SCRIPT_URI'];
+            $current_path = Tools::get_url();
             $url = $current_path.$destination;
             $qr_path = $this->config['file_folder'].'qr_'.round(rand(0,100000)).'_'.$basic_time.'.png';
             if(!$this->create_qr($url, $qr_path)){
@@ -555,33 +563,44 @@ $restacart = new RestaCart();
 $restacart->run();
 
 
-
+/* TOOLS */
+Class Tools{
+    static function get_url() {
+        //YEAH, go to stackoverflow and search something better than this $#!+
+        $protocol = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+        $self = $_SERVER['PHP_SELF'];
+        $exp = explode('/',$self);
+        $me = end($exp);
+        $where = str_replace($me,'',$self);
+        return $protocol.$_SERVER['HTTP_HOST'].$where;
+     }
+}
 
 //This QR Class comes from https://github.com/psyon/php-qrcode
 /****************************************************************************\
 
-qrcode.php - Generate QR Codes. MIT license.
+    qrcode.php - Generate QR Codes. MIT license.
 
-Copyright for portions of this project are held by Kreative Software, 2016-2018.
-All other copyright for the project are held by Donald Becker, 2019
+    Copyright for portions of this project are held by Kreative Software, 2016-2018.
+    All other copyright for the project are held by Donald Becker, 2019
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
 
 \****************************************************************************/
 class QRCode {
