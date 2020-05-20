@@ -442,7 +442,7 @@ LOGOUTFORM;
             $elements_list .= "     <h5>".$data_menu['label']."</h5>"; //name in title
             $elements_list .= "     <p>Carta añadida el dia ".$data_menu['date']."</p>";
             $elements_list .= "     <p><a href='".$data_menu['menu_url']."'>Descargar el fichero que visualizan los clientes: ".$data_menu['original_name']."</a></p>";
-            $elements_list .= "     <p>Dirección donde apunta el QR: [".$data_menu['menu_url']."]";
+            $elements_list .= "     <p>Donde apunta el QR: <br />".$data_menu['menu_url']."</p>";
             //TODO: delete element
             //$elements_list .= "     <form method='post'><input type='hidden' name='element_id' value='".$data_menu['id']."' /><input type='submit' value='Eliminar carta' /></form>";
             $elements_list .= " </div>";
