@@ -429,6 +429,18 @@ LOGOUTFORM;
         
         $this->add_content($this->logout_form);
         
+        ##ADD MENU part
+        $this->add_content("<h4>Añadir carta para generar el QR</h4>");
+        $local_error_string = $this->get_error();
+        if($local_error_string !== false){
+            $output = "<div class='alert'><p>Error al subir la carta.</p>";
+            $output .= $local_error_string."</div>";
+            $this->add_content($output);
+        }
+        $this->add_content($this->upload_form);
+        
+        
+        ##LIST MENU part
         $this->add_content("<h4>Listado de cartas con código QR</h4>");
         $elements_list = "<div><ul>";
         
@@ -456,14 +468,7 @@ LOGOUTFORM;
         
         $this->add_content($elements_list);
 
-        $this->add_content("<h4>Añadir carta para generar el QR</h4>");
-        $local_error_string = $this->get_error();
-        if($local_error_string !== false){
-            $output = "<div class='alert'><p>Error al subir la carta.</p>";
-            $output .= $local_error_string."</div>";
-            $this->add_content($output);
-        }
-        $this->add_content($this->upload_form);
+
         return true;
     }
     
