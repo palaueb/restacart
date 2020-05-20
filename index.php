@@ -50,6 +50,7 @@ Class RestaCart {
         "pdf" => ["application/pdf"]
     );
     private $config_file = '.config';
+    private $config_folder = './.configs/';
     private $export_variable_labels = ['{{HTML_LANG}}'];
     private $export_variables = ['es'];
     private $output_html = "DEFAULT TEXT"; //at this time this must be deleted
@@ -261,6 +262,8 @@ UPLOADFORM;
                 // we will use a insecure but working 777 permision for files folder
                 // TODO: refactor to work with almost any hosting without 777.
                 mkdir($this->config['file_folder'], 0777);
+                mkdir($this->config_folder, 0777);
+                
             }
         }
         return true;
@@ -334,7 +337,7 @@ UPLOADFORM;
                 'date'=>date('d/m/Y',$basic_time)
             ];
             //TODO: move this to his own folder of configs
-            file_put_contents('.info_'.$basic_time.'.json', json_encode($current_data));
+            file_put_contents($this->config_folder.'.info_'.$basic_time.'.json', json_encode($current_data));
         }
     }
     private function logout(){
@@ -493,19 +496,18 @@ UPLOADFORM;
         return $pass;
     }
     private function get_config_files(){
-        $scan = scandir('.');
+        $scan = scandir($this->config_folder);
         $output_files = [];
         foreach($scan as $file){
             if(substr($file,0,6)=='.info_'){
-                $output_files[] = $file;
+                $output_files[] = $this->config_folder.$file;
             }
         }
         return $output_files;
     }
     private function load_config_file($filename){
         $data = file_get_contents($filename);
-        $json = json_decode($data,true);
-        return $json; //as array
+        return json_decode($data,true); //as array
     }
     private function create_qr($url, $qr_path){
         $options = [
