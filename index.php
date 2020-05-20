@@ -206,21 +206,21 @@ UPLOADFORM;
     private function process_post(){
         switch($_POST['action']){
             case 'password':
-                $this->setup_password();
+                return $this->setup_password();
                 break;
             case 'login':
-                $this->start_login();
+                return $this->start_login();
                 break;
             case 'upload_file':
-                $this->upload_file();
+                return $this->upload_file();
                 break;
             case 'logout':
-                $this->logout();
+                return $this->logout();
                 break;
             default:
                 die('this sucks!');
          }
-         return true;
+         return false;
     }
     private function setup_password(){
         if(file_exists('.htaccess') || file_exists($this->config_file)){ return false; }
@@ -281,8 +281,9 @@ UPLOADFORM;
             session_start();
             $this->we_are_in = $_SESSION['restacart'] = true;
             session_write_close();
+        }else{
+            $this->set_error('La contraseña no es válida. Lo siento.');
         }
-        $this->set_error('La contraseña no es válida. Lo siento.');
     }
     private function upload_file(){
         $upload_file = $_FILES['upload_file'];
